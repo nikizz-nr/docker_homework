@@ -1,0 +1,78 @@
+version: "2.2"
+
+services:
+  database:
+    image: postgres:alpine
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER:
+      POSTGRES_PASSWORD:
+      POSTGRES_DB:
+    healthcheck:
+      test: pg_isready -U $${POSTGRES_USER} || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - backend-net
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    restart: unless-stopped
+    ports:
+      - 8000:8000
+    depends_on:
+      database:
+        condition: service_healthy
+    healthcheck:
+      test: curl --fail http://localhost:8000/admin/login/ || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    expose:
+      - 8000
+    networks:
+      - backend-net
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    restart: unless-stopped
+    ports:
+      - 8080:80
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: curl --fail http://localhost:80/ || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    expose:
+      - 80
+    networks:
+      - frontend-net
+
+volumes:
+  pgdata:
+
+networks:
+  frontend-net:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.110.0/24
+          ip_range: 192.168.110.0/24
+  backend-net:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.120.0/24
+          ip_range: 192.168.120.0/24

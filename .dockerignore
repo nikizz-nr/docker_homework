@@ -1,0 +1,6 @@
+Dockerfile*
+.gitignore
+.dockerignore
+README.md
+.env
+build_and_run.sh

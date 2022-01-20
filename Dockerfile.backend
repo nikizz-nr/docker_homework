@@ -1,0 +1,38 @@
+FROM python:3.9-alpine
+
+ENV PYTHONDONTWRITEBYTECODE 1
+
+ENV PYTHONUNBUFFERED 1
+
+COPY ./lib_catalog/requirements.txt /tmp/
+
+RUN \
+ apk update && \
+ apk add --no-cache libxml2 \
+   libxslt \
+   postgresql-libs \
+   curl && \
+ apk add --no-cache --virtual .build-deps gcc \
+   musl-dev \
+   postgresql-dev \
+   libxml2-dev \
+   libxslt-dev && \
+ pip install --no-cache-dir -U pip && \
+ pip install --no-cache-dir -r /tmp/requirements.txt && \
+ apk --purge del .build-deps && \
+ addgroup -S backend && \
+ adduser -D -G backend backend
+
+USER backend
+
+WORKDIR /back_app
+
+COPY --chown=backend:backend ./lib_catalog .
+
+RUN sed -i s/localhost:3000/localhost:8080/ lib_catalog/settings.py
+
+EXPOSE 8000
+
+CMD ["sh", "-c", "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"]
+
+HEALTHCHECK --interval=10s --timeout=5s --retries=3 CMD curl --fail http://localhost:8000/admin/login/ || exit 1
